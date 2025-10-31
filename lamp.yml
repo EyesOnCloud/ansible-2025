@@ -1,0 +1,48 @@
+---
+- name: "Deploying LAMP Stack on Ubuntu"
+  hosts: webservers
+  become: yes
+  tasks:
+    - name: "Install Latest Packages"
+      ansible.builtin.apt:
+        name:
+          - apache2
+          - mariadb-server
+          - php
+          - php-mysql
+          - ufw
+        state: present
+        update_cache: yes
+    - name: "Copy contents"
+      ansible.builtin.copy:
+        content: "Test LAMP Stack"
+        dest: /var/www/html/index.html
+    - name: "Enable and Start Apache2 Service"
+      ansible.builtin.service:
+        name: apache2
+        state: started
+        enabled: yes
+    - name: "Enable and Start MYSQL Service"
+      ansible.builtin.service:
+        name: mariadb
+        state: started
+        enabled: yes
+    - name: "Enable and Start UFW Service"
+      ansible.builtin.ufw:
+        state: enabled
+    - name: "Allow Apache Full in UFW"
+      ansible.builtin.ufw:
+        rule: allow
+        name: 'Apache Full'
+        state: enabled
+    - name: Allow SSH through UFW
+      ufw:
+        rule: allow
+        name: 'OpenSSH'
+- name: Test page
+  hosts: localhost
+  tasks:
+    - name: access page
+      uri:
+        url: http://eoc-node3
+        status_code: 200
