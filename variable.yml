@@ -1,0 +1,50 @@
+---
+- name: Deploying some Packages
+  hosts: eoc-node1
+  become: yes
+  vars:
+    web_pkg: apache2
+    firewall_pkg: ufw
+    web_service: apache2
+    firewall_service: ufw
+    python_pkg: python3-pymysql
+    rule1: 'Apache Full'
+    rule2: 'OpenSSH'
+  tasks:
+    - name: Required packages are installed up-to-date
+      apt:
+        name:
+          - "{{ web_pkg }}"
+          - "{{ firewall_pkg }}"
+          - "{{ python_pkg }}"
+        state: present
+        update_cache: yes
+    - name: the {{ firewall_service }} is enabled
+      ufw:
+        state: enabled
+    - name: The {{ web_service }} service is started and enabled
+      service:
+        name: "{{ web_service }}"
+        enabled: true
+        state: started
+    - name: Web content is in place
+      copy:
+        content: "Example web content Related to Variable"
+        dest: /var/www/html/index.html
+    - name: The ufw port for {{ rule1 }} is open
+      ufw:
+        rule: allow
+        name: "{{ rule1 }}"
+        state: enabled
+    - name: Allow SSH through UFW
+      ufw:
+        rule: allow
+        name: "{{ rule2 }}"
+- name: verify the Apache service
+  hosts: localhost
+  become: false
+  tasks:
+    - name: Ensure the webserver is reachable
+      uri:
+        url: http://eoc-node1
+        status_code: 200
