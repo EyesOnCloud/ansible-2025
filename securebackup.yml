@@ -1,0 +1,10 @@
+---
+- name: Use the fetch module to retrieve auth log files (Ubuntu)
+  hosts: all
+  become: yes
+  tasks:
+    - name: Fetch the /var/log/auth.log file from managed hosts
+      ansible.builtin.fetch:
+        src: /var/log/auth.log
+        dest: secure-backups
+        flat: no
