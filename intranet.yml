@@ -1,0 +1,40 @@
+---
+- name: Configure intranet web server on eoc-node1
+  hosts: eoc-node1
+  become: yes
+  tasks:
+    - name: Install apache2 and ufw packages
+      apt:
+        name:
+          - apache2
+          - ufw
+        state: present
+        update_cache: yes
+    - name: Add custom content
+      copy:
+        content: "Welcome to the example.com intranet!\n"
+        dest: /var/www/html/index.html
+    - name: Enable UFW
+      ufw:
+        state: enabled
+    - name: Allow SSH through UFW
+      ufw:
+        rule: allow
+        name: 'OpenSSH'
+    - name: Allow Apache
+      ufw:
+        rule: allow
+        name: 'Apache'
+    - name: Enable and start apache2
+      service:
+        name: apache2
+        state: started
+        enabled: yes
+- name: Test intranet web server from localhost
+  hosts: localhost
+  become: no
+  tasks:
+    - name: Connect to intranet web server
+      uri:
+        url: http://eoc-node1
+        return_content: yes
