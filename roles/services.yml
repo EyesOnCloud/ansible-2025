@@ -1,0 +1,11 @@
+---
+- name: Enable and Start Apache2 Service
+  ansible.builtin.service:
+    name: "{{ apache_svc }}"
+    state: restarted
+    enabled: true
+- name: Enable and Start UFW Service
+  ansible.builtin.service:
+    name: "{{ firewall_svc }}"
+    state: restarted
+    enabled: true
