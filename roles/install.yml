@@ -1,0 +1,8 @@
+---
+- name: Install Packages
+  ansible.builtin.apt:
+    name:
+      - "{{ apache_pkgs }}"
+      - "{{ firewall_pkg }}"
+    state: present
+    update_cache: yes
