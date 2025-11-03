@@ -1,0 +1,11 @@
+---
+- name: Add an exception for SSH in the firewall
+  ansible.builtin.ufw:
+    rule: allow
+    name: OpenSSH
+    state: enabled
+- name: Add an exception for Apache in the firewall
+  ansible.builtin.ufw:
+    rule: allow
+    name: "{{ apache_rule }}"
+    state: enabled
