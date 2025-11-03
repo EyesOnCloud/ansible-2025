@@ -4,4 +4,4 @@
     src: files/index.html
     dest: /var/www/html/index.html
   notify:
-    - restart webservice
+    - restart apache
