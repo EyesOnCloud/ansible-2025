@@ -1,0 +1,18 @@
+---
+- name: Update web server
+  hosts: "webservers,dev"
+  become: yes
+  tasks:
+    - name: Latest apache2 package installed
+      ansible.builtin.apt:
+        name: apache2
+        state: latest
+        update_cache: yes
+      notify:
+        - Restart apache2
+  handlers:
+    - name: Restart apache2
+      ansible.builtin.service:
+        name: apache2
+        enabled: yes
+        state: restarted
