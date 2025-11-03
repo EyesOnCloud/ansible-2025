@@ -1,0 +1,6 @@
+---
+apache_pkgs: apache2
+apache_svc: apache2
+apache_rule: Apache
+firewall_pkg: ufw
+firewall_svc: ufw
