@@ -24,18 +24,33 @@
         regexp: '^([^#].*\bswap\b.*)'
         replace: '# \1'
 
-    - name: Ensure br_netfilter is enabled
+    - name: Ensure overlay and br_netfilter modules are loaded
       ansible.builtin.modprobe:
-        name: br_netfilter
+        name: "{{ item }}"
         state: present
+      loop:
+        - overlay
+        - br_netfilter
 
-    - name: Update kernel settings for bridge networking
-      ansible.builtin.sysctl:
-        name: net.bridge.bridge-nf-call-iptables
-        value: 1
-        sysctl_set: yes
-        state: present
-        reload: yes
+    - name: Ensure Kubernetes sysctls are set
+      ansible.builtin.copy:
+        dest: /etc/sysctl.d/kubernetes.conf
+        content: |
+          net.bridge.bridge-nf-call-ip6tables = 1
+          net.bridge.bridge-nf-call-iptables = 1
+          net.ipv4.ip_forward = 1
+        mode: '0644'
+
+    - name: Apply sysctl settings
+      ansible.builtin.command: sysctl –system
+
+    - name: Load overlay and br_netfilter on boot
+      ansible.builtin.copy:
+        dest: /etc/modules-load.d/k8s.conf
+        content: |
+          overlay
+          br_netfilter
+        mode: '0644'
 
     - name: Install prerequisite packages
       ansible.builtin.apt:
@@ -69,7 +84,8 @@
 
     - name: Add Docker repository for Ubuntu
       ansible.builtin.shell: |
-        echo "deb [arch={{ ansible_architecture | lower }} signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu {{ ansible_lsb.codename }} stable" > /etc/apt/sources.list.d/docker.list
+        echo "deb [arch={{ ansible_architecture | lower }} signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu {{ ansible_lsb.codename 
+e" > /etc/apt/sources.list.d/docker.list
       args:
         creates: /etc/apt/sources.list.d/docker.list
 
