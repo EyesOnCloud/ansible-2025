@@ -1,0 +1,21 @@
+---
+- hosts: "controller"
+  become: yes
+  tasks:
+    - name: install kustomization tool
+      shell: |
+        curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"  | bash
+    - name: creating yaml file
+      shell: |
+        cat > kustomization.yml << EOF
+        apiVersion: kustomize.config.k8s.io/v1beta1
+        kind: Kustomization
+        resources:
+          - github.com/ansible/awx-operator/config/default?ref=2.19.0
+        images:
+          - name: quay.io/ansible/awx-operator
+            newTag: 2.19.0
+        namespace: awx
+        EOF
+    - name: applying the file
+      shell: kubectl apply -k .
