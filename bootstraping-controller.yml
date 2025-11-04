@@ -1,165 +1,39 @@
 ---
-- hosts: "controller,workers"
+- hosts: controller
   become: yes
+  vars:
+    token_file: join_token
   tasks:
-
-    - name: Disabling UFW service
-      ansible.builtin.service:
-        name: ufw
-        state: stopped
-        enabled: no
-
-    - name: Enabling and Starting Chrony
-      ansible.builtin.service:
-        name: chrony
-        state: started
-        enabled: yes
-
-    - name: Disabling Swap on all nodes
-      ansible.builtin.shell: swapoff -a
-
-    - name: Commenting Swap entries in /etc/fstab
-      ansible.builtin.replace:
-        path: /etc/fstab
-        regexp: '^([^#].*\bswap\b.*)'
-        replace: '# \1'
-
-    - name: Ensure overlay and br_netfilter modules are loaded
-      ansible.builtin.modprobe:
-        name: "{{ item }}"
-        state: present
-      loop:
-        - overlay
-        - br_netfilter
-
-    - name: Ensure Kubernetes sysctls are set
-      ansible.builtin.copy:
-        dest: /etc/sysctl.d/kubernetes.conf
-        content: |
-          net.bridge.bridge-nf-call-ip6tables = 1
-          net.bridge.bridge-nf-call-iptables = 1
-          net.ipv4.ip_forward = 1
-        mode: '0644'
-
-    - name: Apply sysctl settings
-      ansible.builtin.command: sysctl –system
-
-    - name: Load overlay and br_netfilter on boot
-      ansible.builtin.copy:
-        dest: /etc/modules-load.d/k8s.conf
-        content: |
-          overlay
-          br_netfilter
-        mode: '0644'
-
-    - name: Install prerequisite packages
-      ansible.builtin.apt:
-        name:
-          - apt-transport-https
-          - ca-certificates
-          - software-properties-common
-          - gnupg2
-          - wget
-          - curl
-          - git
-        state: present
-        update_cache: yes
-
-    - name: Create /etc/apt/keyrings directory
-      ansible.builtin.file:
-        path: /etc/apt/keyrings
+   
+    - name: Resetting kubeadm
+      shell: kubeadm reset -f
+      register: output
+      
+    - name: Initialize the deployment of Kubernetes cluster
+      shell: kubeadm init --pod-network-cidr=10.10.0.0/16
+      register: output
+      
+    - name: "Configuration Files Setup"
+      file:
+        path: "$HOME/.kube"
         state: directory
-        mode: '0755'
+        
+    - name: "Copying Configuration File"
+      copy:
+        src: /etc/kubernetes/admin.conf
+        dest: $HOME/.kube/config
+        remote_src: yes
+        
+    - name: Change kubeconfig file permission
+      file:
+        path: $HOME/.kube/config
+        owner: "{{ ansible_effective_user_id }}"
+        group: "{{ ansible_effective_group_id }}"
+        
+    - name: "Downloading CNI Plugin"
+      shell: |
+        kubectl apply -f https://docs.projectcalico.org/manifests/calico.yaml 
 
-    - name: Download Docker GPG key
-      ansible.builtin.get_url:
-        url: https://download.docker.com/linux/ubuntu/gpg
-        dest: /etc/apt/keyrings/docker.asc
-        mode: '0644'
-
-    - name: Set permissions on Docker GPG key
-      ansible.builtin.file:
-        path: /etc/apt/keyrings/docker.asc
-        mode: '0644'
-
-    - name: Add Docker repository for Ubuntu
-      ansible.builtin.shell: |
-        echo "deb [arch={{ ansible_architecture | lower }} signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu {{ ansible_lsb.codename 
-e" > /etc/apt/sources.list.d/docker.list
-      args:
-        creates: /etc/apt/sources.list.d/docker.list
-
-    - name: Update apt cache for new repo
-      ansible.builtin.apt:
-        update_cache: yes
-
-    - name: Install containerd package
-      ansible.builtin.apt:
-        name: containerd
-        state: present
-
-    - name: Create /etc/containerd directory
-      ansible.builtin.file:
-        path: /etc/containerd
-        state: directory
-        mode: '0755'
-
-    - name: Generate default containerd config
-      ansible.builtin.command: containerd config default
-      register: containerd_default_config
-
-    - name: Write containerd config to file
-      ansible.builtin.copy:
-        dest: /etc/containerd/config.toml
-        content: "{{ containerd_default_config.stdout }}"
-        mode: '0644'
-
-    - name: Enable SystemdCgroup in config.toml
-      ansible.builtin.replace:
-        path: /etc/containerd/config.toml
-        regexp: 'SystemdCgroup = false'
-        replace: 'SystemdCgroup = true'
-
-    - name: Create /etc/crictl.yaml
-      ansible.builtin.copy:
-        dest: /etc/crictl.yaml
-        content: |
-          runtime-endpoint: unix:///var/run/containerd/containerd.sock
-          image-endpoint: unix:///var/run/containerd/containerd.sock
-          timeout: 10
-        mode: '0644'
-
-    - name: Restart containerd service
-      ansible.builtin.service:
-        name: containerd
-        state: restarted
-
-    - name: Download Kubernetes apt repo GPG key
-      ansible.builtin.shell:
-        curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.34/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
-
-    - name: Add Kubernetes apt repository for v1.34
-      ansible.builtin.shell: |
-        echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.34/deb/ /' > /etc/apt/sources.list.d/kubernetes.list
-      args:
-        creates: /etc/apt/sources.list.d/kubernetes.list
-
-    - name: Update apt package index
-      ansible.builtin.apt:
-        update_cache: yes
-
-    - name: Install kubelet, kubeadm, kubectl
-      ansible.builtin.apt:
-        name:
-          - kubelet
-          - kubeadm
-          - kubectl
-        state: present
-
-    - name: Pin kubelet, kubeadm, kubectl version
-      ansible.builtin.shell: apt-mark hold kubelet kubeadm kubectl
-
-    - name: Starting Kubelet Service
-      ansible.builtin.service:
-        name: kubelet
-        state: started
+    - name: Storing Logs and Generated token for future purpose.
+      local_action: copy content={{ output.stdout }} dest={{ token_file }}
+      become: False
