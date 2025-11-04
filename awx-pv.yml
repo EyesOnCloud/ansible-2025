@@ -1,0 +1,28 @@
+---
+- hosts: "controller"
+  become: yes
+  tasks:
+    - name: Ensure /opt/awx/pgdata directory exists for Postgres
+      ansible.builtin.file:
+        path: /opt/awx/pgdata
+        state: directory
+        mode: '0700'
+    - name: creating a pv for awx
+      shell: |
+        cat > awx-pv.yml << EOF
+        apiVersion: v1
+        kind: PersistentVolume
+        metadata:
+          name: awx-pv
+        spec:
+          capacity:
+            storage: 15Gi
+          accessModes:
+            - ReadWriteOnce
+          persistentVolumeReclaimPolicy: Retain
+          storageClassName: ""
+          hostPath:
+            path: "/"
+        EOF
+    - name: apply the PV
+      shell: kubectl apply -f awx-pv.yml
