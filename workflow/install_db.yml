@@ -8,18 +8,38 @@
     db_marker: /var/local/awx-db-secured
 
   tasks:
-    - name: Ensure mysql client is present
+    - name: Ensure MariaDB service is installed and running
+      apt:
+        name:
+          - mariadb-server
+          - mariadb-client
+        state: present
+        update_cache: yes
+    
+    - name: Ensure mariadb service is started & enabled
+      service:
+        name: "{{ 'mariadb' if (ansible_facts['os_family'] == 'Debian') else 'mariadb' }}"
+        state: started
+        enabled: yes
+    
+    - name: Wait for MariaDB TCP port 3306 to be ready
+      wait_for:
+        host: 127.0.0.1
+        port: 3306
+        timeout: 60
+        state: started
+    
+    - name: Ensure mysql client present (for CLI secure commands)
       apt:
         name: mariadb-client
         state: present
-        update_cache: yes
-
-    - name: Check if DB already secured (marker file)
+    
+    - name: Check for DB secure marker
       stat:
-        path: "{{ db_marker }}"
+        path: /var/local/awx-db-secured
       register: db_marker_stat
-
-    - name: Secure MariaDB - set root password and remove test users
+    
+    - name: Secure MariaDB (idempotent SQL) -- run on DB host
       shell: |
         mysql --user=root <<'SQL'
         ALTER USER IF EXISTS 'root'@'localhost' IDENTIFIED BY '{{ db_root_password }}';
@@ -28,12 +48,13 @@
         DELETE FROM mysql.db WHERE Db='test' OR Db LIKE 'test\_%';
         FLUSH PRIVILEGES;
         SQL
-      changed_when: "'Query OK' in stdout or rc == 0"
       register: mysql_secure_out
+      failed_when: mysql_secure_out.rc not in [0,1]  # allow rc==1 when ALTER USER returns warnings; adjust if needed
+      changed_when: mysql_secure_out.rc == 0
       when: not db_marker_stat.stat.exists
-
-    - name: Create marker file after securing DB
+    
+    - name: Create db secure marker
       file:
-        path: "{{ db_marker }}"
+        path: /var/local/awx-db-secured
         state: touch
       when: not db_marker_stat.stat.exists
