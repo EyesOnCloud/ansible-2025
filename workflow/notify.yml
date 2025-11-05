@@ -1,7 +1,6 @@
 ---
 - name: Send summary notification
-  hosts: localhost
-  connection: local
+  hosts: 192.168.100.150
   gather_facts: false
   tasks:
     - name: Print workflow summary
