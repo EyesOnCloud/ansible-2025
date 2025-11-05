@@ -1,6 +1,6 @@
 ---
 - name: Secure MariaDB (idempotent SQL approach)
-  hosts: dbservers
+  hosts: dev
   become: yes
   gather_facts: false
   vars:
