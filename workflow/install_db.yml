@@ -1,0 +1,57 @@
+---
+- name: Install and configure MariaDB server
+  hosts: dev
+  become: yes
+  gather_facts: yes
+
+  vars:
+    db_root_password: "RootPass123!"
+    app_db_name: "myappdb"
+    app_db_user: "appuser"
+    app_db_pass: "AppUserPass!"
+
+  tasks:
+    - name: Install MariaDB server and client
+      apt:
+        name:
+          - mariadb-server
+          - mariadb-client
+        state: present
+        update_cache: yes
+
+    - name: Ensure MariaDB is running
+      service:
+        name: mariadb
+        state: started
+        enabled: yes
+
+    - name: Secure MariaDB installation
+      mysql_secure_installation:
+        login_password: ''
+        root_password: "{{ db_root_password }}"
+        user: root
+        login_user: root
+        state: present
+        change_root_password: yes
+        remove_anonymous_users: yes
+        disallow_root_login_remotely: yes
+        remove_test_database: yes
+        update_root_password: yes
+      ignore_errors: yes
+
+    - name: Create application database
+      mysql_db:
+        name: "{{ app_db_name }}"
+        state: present
+        login_user: root
+        login_password: "{{ db_root_password }}"
+
+    - name: Create application DB user
+      mysql_user:
+        name: "{{ app_db_user }}"
+        password: "{{ app_db_pass }}"
+        priv: "{{ app_db_name }}.*:ALL"
+        host: "%"
+        state: present
+        login_user: root
+        login_password: "{{ db_root_password }}"
