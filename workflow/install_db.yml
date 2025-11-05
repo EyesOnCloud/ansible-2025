@@ -1,57 +1,39 @@
 ---
-- name: Install and configure MariaDB server
-  hosts: dev
+- name: Secure MariaDB (idempotent SQL approach)
+  hosts: dbservers
   become: yes
-  gather_facts: yes
-
+  gather_facts: false
   vars:
     db_root_password: "RootPass123!"
-    app_db_name: "myappdb"
-    app_db_user: "appuser"
-    app_db_pass: "AppUserPass!"
+    db_marker: /var/local/awx-db-secured
 
   tasks:
-    - name: Install MariaDB server and client
+    - name: Ensure mysql client is present
       apt:
-        name:
-          - mariadb-server
-          - mariadb-client
+        name: mariadb-client
         state: present
         update_cache: yes
 
-    - name: Ensure MariaDB is running
-      service:
-        name: mariadb
-        state: started
-        enabled: yes
+    - name: Check if DB already secured (marker file)
+      stat:
+        path: "{{ db_marker }}"
+      register: db_marker_stat
 
-    - name: Secure MariaDB installation
-      mysql_secure_installation:
-        login_password: ''
-        root_password: "{{ db_root_password }}"
-        user: root
-        login_user: root
-        state: present
-        change_root_password: yes
-        remove_anonymous_users: yes
-        disallow_root_login_remotely: yes
-        remove_test_database: yes
-        update_root_password: yes
-      ignore_errors: yes
+    - name: Secure MariaDB - set root password and remove test users
+      shell: |
+        mysql --user=root <<'SQL'
+        ALTER USER IF EXISTS 'root'@'localhost' IDENTIFIED BY '{{ db_root_password }}';
+        DELETE FROM mysql.user WHERE User='';
+        DROP DATABASE IF EXISTS test;
+        DELETE FROM mysql.db WHERE Db='test' OR Db LIKE 'test\_%';
+        FLUSH PRIVILEGES;
+        SQL
+      changed_when: "'Query OK' in stdout or rc == 0"
+      register: mysql_secure_out
+      when: not db_marker_stat.stat.exists
 
-    - name: Create application database
-      mysql_db:
-        name: "{{ app_db_name }}"
-        state: present
-        login_user: root
-        login_password: "{{ db_root_password }}"
-
-    - name: Create application DB user
-      mysql_user:
-        name: "{{ app_db_user }}"
-        password: "{{ app_db_pass }}"
-        priv: "{{ app_db_name }}.*:ALL"
-        host: "%"
-        state: present
-        login_user: root
-        login_password: "{{ db_root_password }}"
+    - name: Create marker file after securing DB
+      file:
+        path: "{{ db_marker }}"
+        state: touch
+      when: not db_marker_stat.stat.exists
