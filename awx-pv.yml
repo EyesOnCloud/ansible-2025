@@ -1,23 +1,11 @@
 ---
-- hosts: "controller"
+- hosts: controller
   become: yes
   tasks:
-    - name: creating a pv for awx
-      shell: |
-        cat > awx.yml << EOF
-        apiVersion: v1
-        kind: PersistentVolume
-        metadata:
-          name: awx-pv
-        spec:
-          capacity:
-            storage: 15Gi
-          accessModes:
-            - ReadWriteOnce
-          persistentVolumeReclaimPolicy: Retain
-          storageClassName: ""
-          hostPath:
-            path: "/tmp"
-        EOF
-    - name: apply the PV
-      shell: kubectl apply -f awx-pv.yml
+    - name: Let's install Rancher storage provider
+      ansible.builtin.command:
+        cmd: kubectl apply -f https://raw.githubusercontent.com/rancher/local-path-provisioner/v0.0.32/deploy/local-path-storage.yaml
+
+    - name: Mark local-path StorageClass as default
+      ansible.builtin.command:
+        cmd: "kubectl patch storageclass local-path -p '{\"metadata\": {\"annotations\":{\"storageclass.kubernetes.io/is-default-class\":\"true\"}}}'"
