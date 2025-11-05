@@ -1,0 +1,12 @@
+---
+- name: Rollback to previous version
+  hosts: webservers
+  become: yes
+  gather_facts: false
+
+  tasks:
+    - name: Replace index.php with maintenance message
+      copy:
+        dest: /var/www/html/index.php
+        content: "<?php echo 'Maintenance in progress. Rollback active.'; ?>"
+        mode: '0644'
