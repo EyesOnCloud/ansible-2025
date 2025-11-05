@@ -1,7 +1,7 @@
 ---
-# Job Template: Install Database (Ubuntu-friendly)
+# install_db_ubuntu.yml
 - name: Install and secure MariaDB on Ubuntu
-  hosts: dev
+  hosts: dbservers
   become: yes
   gather_facts: yes
   vars:
@@ -12,7 +12,7 @@
     db_marker: /var/local/awx-db-secured
 
   tasks:
-    - name: Ensure apt cache is up to date
+    - name: Update apt cache
       apt:
         update_cache: yes
       changed_when: false
@@ -31,22 +31,25 @@
         state: started
         enabled: yes
 
-    - name: Wait for MariaDB socket or TCP port to appear
+    - name: Wait for MariaDB socket (short)
       wait_for:
         path: /var/run/mysqld/mysqld.sock
-        timeout: 30
+        timeout: 10
       register: wait_sock
       failed_when: false
+      changed_when: false
 
-    - name: If socket not present, wait for TCP 3306 (fallback)
+    - name: Wait for MariaDB TCP port 3306 (fallback)
       wait_for:
         host: 127.0.0.1
         port: 3306
         timeout: 30
-      when: not wait_sock|success
+      register: wait_tcp
       failed_when: false
+      changed_when: false
+      when: wait_sock is failed
 
-    - name: Check if DB already secured (marker file)
+    - name: Check for DB secure marker
       stat:
         path: "{{ db_marker }}"
       register: db_marker_stat
@@ -54,13 +57,10 @@
     - name: Secure MariaDB and create app DB/user (run as root on DB host)
       shell: |
         mysql <<'SQL'
-        -- set root password and secure server
         ALTER USER IF EXISTS 'root'@'localhost' IDENTIFIED BY '{{ db_root_password }}';
         DELETE FROM mysql.user WHERE User='';
         DROP DATABASE IF EXISTS test;
         DELETE FROM mysql.db WHERE Db='test' OR Db LIKE 'test\_%';
-        FLUSH PRIVILEGES;
-        -- create application DB and user
         CREATE DATABASE IF NOT EXISTS {{ app_db_name }} CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
         CREATE USER IF NOT EXISTS '{{ app_db_user }}'@'%' IDENTIFIED BY '{{ app_db_pass }}';
         GRANT ALL PRIVILEGES ON {{ app_db_name }}.* TO '{{ app_db_user }}'@'%';
@@ -79,7 +79,7 @@
         state: touch
       when: not db_marker_stat.stat.exists
 
-    - name: Show result (debug)
+    - name: Show mysql secure output (debug)
       debug:
         var: mysql_secure_out
       when: mysql_secure_out is defined
