@@ -1,6 +1,6 @@
 ---
 - name: AWX simple job-slicing demo
-  hosts: webservers
+  hosts: webserver
   become: true
 
   tasks:
