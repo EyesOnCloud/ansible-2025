@@ -1,0 +1,21 @@
+---
+- name: Validate web app
+  hosts: webserver
+  become: yes
+  gather_facts: false
+
+  tasks:
+    - name: Check HTTP response
+      uri:
+        url: "http://192.168.100.152/"
+        status_code: 200
+      register: site_check
+
+    - name: Fail if site not OK
+      fail:
+        msg: "Health check failed on {{ inventory_hostname }}"
+      when: site_check.status != 200
+
+    - name: Report health check success
+      debug:
+        msg: "Site running fine on {{ inventory_hostname }}"
