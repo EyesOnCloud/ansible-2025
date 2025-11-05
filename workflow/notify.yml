@@ -1,0 +1,9 @@
+---
+- name: Send summary notification
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Print workflow summary
+      debug:
+        msg: "LAMP stack deployment and health check completed successfully!"
