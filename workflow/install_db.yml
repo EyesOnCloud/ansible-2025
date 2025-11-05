@@ -1,60 +1,85 @@
 ---
-- name: Secure MariaDB (idempotent SQL approach)
+# Job Template: Install Database (Ubuntu-friendly)
+- name: Install and secure MariaDB on Ubuntu
   hosts: dev
   become: yes
-  gather_facts: false
+  gather_facts: yes
   vars:
     db_root_password: "RootPass123!"
+    app_db_name: "myappdb"
+    app_db_user: "appuser"
+    app_db_pass: "AppUserPass!"
     db_marker: /var/local/awx-db-secured
 
   tasks:
-    - name: Ensure MariaDB service is installed and running
+    - name: Ensure apt cache is up to date
+      apt:
+        update_cache: yes
+      changed_when: false
+
+    - name: Install MariaDB server and client
       apt:
         name:
           - mariadb-server
           - mariadb-client
         state: present
         update_cache: yes
-    
-    - name: Ensure mariadb service is started & enabled
+
+    - name: Ensure mariadb service is started and enabled
       service:
-        name: "{{ 'mariadb' if (ansible_facts['os_family'] == 'Debian') else 'mariadb' }}"
+        name: mariadb
         state: started
         enabled: yes
-    
-    - name: Wait for MariaDB TCP port 3306 to be ready
+
+    - name: Wait for MariaDB socket or TCP port to appear
+      wait_for:
+        path: /var/run/mysqld/mysqld.sock
+        timeout: 30
+      register: wait_sock
+      failed_when: false
+
+    - name: If socket not present, wait for TCP 3306 (fallback)
       wait_for:
         host: 127.0.0.1
         port: 3306
-        timeout: 60
-        state: started
-    
-    - name: Ensure mysql client present (for CLI secure commands)
-      apt:
-        name: mariadb-client
-        state: present
-    
-    - name: Check for DB secure marker
+        timeout: 30
+      when: not wait_sock|success
+      failed_when: false
+
+    - name: Check if DB already secured (marker file)
       stat:
-        path: /var/local/awx-db-secured
+        path: "{{ db_marker }}"
       register: db_marker_stat
-    
-    - name: Secure MariaDB (idempotent SQL) -- run on DB host
+
+    - name: Secure MariaDB and create app DB/user (run as root on DB host)
       shell: |
-        mysql --user=root <<'SQL'
+        mysql <<'SQL'
+        -- set root password and secure server
         ALTER USER IF EXISTS 'root'@'localhost' IDENTIFIED BY '{{ db_root_password }}';
         DELETE FROM mysql.user WHERE User='';
         DROP DATABASE IF EXISTS test;
         DELETE FROM mysql.db WHERE Db='test' OR Db LIKE 'test\_%';
         FLUSH PRIVILEGES;
+        -- create application DB and user
+        CREATE DATABASE IF NOT EXISTS {{ app_db_name }} CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+        CREATE USER IF NOT EXISTS '{{ app_db_user }}'@'%' IDENTIFIED BY '{{ app_db_pass }}';
+        GRANT ALL PRIVILEGES ON {{ app_db_name }}.* TO '{{ app_db_user }}'@'%';
+        FLUSH PRIVILEGES;
         SQL
+      args:
+        executable: /bin/bash
       register: mysql_secure_out
-      failed_when: mysql_secure_out.rc not in [0,1]  # allow rc==1 when ALTER USER returns warnings; adjust if needed
       changed_when: mysql_secure_out.rc == 0
+      failed_when: mysql_secure_out.rc not in [0]
       when: not db_marker_stat.stat.exists
-    
-    - name: Create db secure marker
+
+    - name: Create db secure marker file
       file:
-        path: /var/local/awx-db-secured
+        path: "{{ db_marker }}"
         state: touch
       when: not db_marker_stat.stat.exists
+
+    - name: Show result (debug)
+      debug:
+        var: mysql_secure_out
+      when: mysql_secure_out is defined
