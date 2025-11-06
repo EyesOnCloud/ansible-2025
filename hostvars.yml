@@ -1,19 +1,27 @@
 ---
-- name: Demonstrate host vars in AWX
-  hosts: webserver
+- name: Collect info from all hosts
+  hosts: all
   gather_facts: false
   tasks:
-    - name: Show environment details
+    - name: Generate message per host
       debug:
-        msg: "Host {{ inventory_hostname }} is running in {{ env }} environment as a {{ server_role }} server."
-    - name: Show custom app message
-      debug:
-        msg: "{{ app_message }}"
-    - name: Write message in a file
-      become: yes
+        msg: "Host {{ inventory_hostname }} in {{ env }} environment with role {{ server_role }}"
+      register: host_message
+    - name: Store message in a fact
+      set_fact:
+        collected_msg: "{{ host_message.msg }}"
+        
+- name: Combine outputs and write to a single file
+  hosts: test
+  gather_facts: false
+  tasks:
+    - name: Combine all host messages
+      set_fact:
+        combined_output: |
+          {% for host in play_hosts %}
+          {{ hostvars[host]['collected_msg'] }}
+          {% endfor %}
+    - name: Write combined output to file
       copy:
-        dest: /home/admin/vars.txt
-        content: |
-          {{ app_message }}
-          Server role: {{ server_role }}
-          Environment: {{ env }}
+        dest: /tmp/all_hosts_output.txt
+        content: "{{ combined_output }}"
