@@ -25,10 +25,11 @@
         mysql -e "CREATE DATABASE IF NOT EXISTS {{ app_db_name }};"
 
     - name: Create application DB user and grant privileges
-      shell: >
-        mysql -e "CREATE USER IF NOT EXISTS '{{ app_db_user }}'@'%' IDENTIFIED BY '{{ app_db_password }}';
-    GRANT ALL PRIVILEGES ON {{ app_db_name }}.* TO '{{ app_db_user }}'@'%';
-    FLUSH PRIVILEGES;"
+      shell: |
+        mysql -e "
+        CREATE USER IF NOT EXISTS '{{ app_db_user }}'@'%' IDENTIFIED BY '{{ app_db_password }}';
+        GRANT ALL PRIVILEGES ON {{ app_db_name }}.* TO '{{ app_db_user }}'@'%';
+        FLUSH PRIVILEGES;"
 
   handlers:
     - name: restart mariadb
