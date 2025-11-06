@@ -1,0 +1,21 @@
+---
+version: 3
+dependencies:
+  ansible_core:
+    package_pip: ansible-core==2.16.6
+  system:
+    - iproute
+    - curl
+    - net-tools
+  python:
+    - requests
+    - boto3
+    - netaddr
+  galaxy:
+    collections:
+      - name: ansible.posix
+      - name: community.general
+      - name: amazon.aws
+images:
+  base_image:
+    name: quay.io/ansible/ansible-runner:stable-2.16-latest
