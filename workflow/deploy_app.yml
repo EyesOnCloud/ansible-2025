@@ -1,33 +1,55 @@
 ---
-- name: Install Apache + PHP and deploy app page
+- name: Install Apache + PHP-FPM and deploy app page
   hosts: webserver
   become: yes
   vars:
     index_path: /var/www/html/index.php
     success_marker: "APPLICATION_INSTALL_SUCCESS"
+    php_fpm_conf_path: /etc/apache2/conf-available/php-fpm.conf
+    php_fpm_socket: /run/php/php8.3-fpm.sock   # adjust if your PHP version differs
+
   tasks:
-    - name: Install Apache and PHP and php-mysql
+    - name: Install Apache and PHP packages
       apt:
         name:
           - apache2
           - php
-          - libapache2-mod-php
           - php-mysql
+          - php8.3-fpm
         state: present
 
-    - name: Ensure apache is enabled and started
-      service:
-        name: apache2
-        state: started
-        enabled: yes
+    - name: Enable Apache modules required for PHP-FPM
+      shell: |
+        a2enmod proxy proxy_fcgi setenvif
+        a2dismod php8.3 || true
+      args:
+        warn: false
+      changed_when: false
 
-    - name: Create idempotent PHP page showing date/time and success notification
+    - name: Create php-fpm Apache config
+      copy:
+        dest: "{{ php_fpm_conf_path }}"
+        content: |
+          <IfModule proxy_fcgi_module>
+              <FilesMatch \.php$>
+                  SetHandler "proxy:unix:{{ php_fpm_socket }}|fcgi://localhost/"
+              </FilesMatch>
+          </IfModule>
+      notify: Reload apache
+
+    - name: Enable php-fpm Apache config
+      command: a2enconf php-fpm
+      args:
+        warn: false
+      register: a2enconf_out
+      changed_when: "'enabled' in a2enconf_out.stdout.lower()"
+
+    - name: Deploy index.php with success marker and date/time
       copy:
         dest: "{{ index_path }}"
         content: |
           <?php
-          // Simple page: shows date/time and a success message with a marker to check in health_check
-          echo "<html><head><title>Simple LAMP App</title></head><body>";
+          echo "<!doctype html><html><head><meta charset='utf-8'><title>Simple LAMP App</title></head><body>";
           echo "<h1>Simple LAMP App</h1>";
           echo "<p>Server date/time: " . date('Y-m-d H:i:s') . "</p>";
           echo "<div>Application installed successfully — {{ success_marker }}</div>";
@@ -35,16 +57,15 @@
         owner: www-data
         group: www-data
         mode: '0644'
-
-    - name: Ensure ownership of webroot
-      file:
-        path: /var/www/html
-        owner: www-data
-        group: www-data
-        recurse: no
+      notify: Restart apache
 
   handlers:
-    - name: restart apache
+    - name: Reload apache
+      service:
+        name: apache2
+        state: reloaded
+
+    - name: Restart apache
       service:
         name: apache2
         state: restarted
