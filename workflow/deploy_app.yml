@@ -80,7 +80,7 @@
               if ($result) {
                   $row = $result->fetch_row();
                   echo "<div style='color:green;'>Connected to MySQL at " . show($db_host) . "</div>";
-                  echo "<p>Database current time: " . show($row[0]) . "</p>";
+                  echo "<p>" . show($row[0]) . "</p>";
                   $result->free();
               } else {
                   echo "<div style='color:orange;'>DB connected but query failed.</div>";
