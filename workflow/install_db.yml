@@ -1,4 +1,4 @@
-# install_db.yml
+---
 - name: Install and configure MariaDB (LAMP project)
   hosts: db
   become: yes
