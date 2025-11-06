@@ -2,15 +2,15 @@
 - name: Install Apache + PHP-FPM and deploy app page
   hosts: webserver
   become: yes
-vars:
-  index_path: /var/www/html/index.php
-  success_marker: "APPLICATION_INSTALL_SUCCESS"
-  php_fpm_conf_path: /etc/apache2/conf-available/php-fpm.conf
-  php_fpm_socket: /run/php/php8.3-fpm.sock
-  db_host: 192.168.100.151       
-  db_name: lampdb
-  db_user: lampuser
-  db_password: lamppass
+  vars:
+    index_path: /var/www/html/index.php
+    success_marker: "APPLICATION_INSTALL_SUCCESS"
+    php_fpm_conf_path: /etc/apache2/conf-available/php-fpm.conf
+    php_fpm_socket: /run/php/php8.3-fpm.sock
+    db_host: 192.168.100.151       
+    db_name: lampdb
+    db_user: lampuser
+    db_password: lamppass
   tasks:
     - name: Install Apache and PHP packages
       apt:
