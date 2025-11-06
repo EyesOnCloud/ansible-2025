@@ -1,85 +1,42 @@
----
-# install_db_ubuntu.yml
-- name: Install and secure MariaDB on Ubuntu (no ufw module)
-  hosts: dbservers
+# install_db.yml
+- name: Install and configure MariaDB (LAMP project)
+  hosts: db
   become: yes
-  gather_facts: yes
   vars:
-    db_root_password: "RootPass123!"
-    app_db_name: "myappdb"
-    app_db_user: "appuser"
-    app_db_pass: "AppUserPass!"
-    db_marker: /var/local/awx-db-secured
-
+    mysql_root_password: "" 
+    app_db_name: lampdb
+    app_db_user: lampuser
+    app_db_password: lamppass
   tasks:
-    - name: Update apt cache
+    - name: Install MariaDB server
       apt:
-        update_cache: yes
-      changed_when: false
-
-    - name: Install MariaDB server and client
-      apt:
-        name:
-          - mariadb-server
-          - mariadb-client
+        name: mariadb-server
         state: present
-        update_cache: yes
 
-    - name: Ensure mariadb service is started and enabled
+    - name: Ensure MariaDB is enabled and running
       service:
         name: mariadb
         state: started
         enabled: yes
 
-    - name: Wait for MariaDB socket (short)
-      wait_for:
-        path: /var/run/mysqld/mysqld.sock
-        timeout: 10
-      register: wait_sock
-      failed_when: false
-      changed_when: false
-
-    - name: Wait for MariaDB TCP port 3306 (fallback)
-      wait_for:
-        host: 127.0.0.1
-        port: 3306
-        timeout: 30
-      register: wait_tcp
-      failed_when: false
-      changed_when: false
-      when: wait_sock is failed
-
-    - name: Check for DB secure marker
-      stat:
-        path: "{{ db_marker }}"
-      register: db_marker_stat
-
-    - name: Secure MariaDB and create app DB/user (run as root on DB host)
-      shell: |
-        mysql <<'SQL'
-        ALTER USER IF EXISTS 'root'@'localhost' IDENTIFIED BY '{{ db_root_password }}';
-        DELETE FROM mysql.user WHERE User='';
-        DROP DATABASE IF EXISTS test;
-        DELETE FROM mysql.db WHERE Db='test' OR Db LIKE 'test\_%';
-        CREATE DATABASE IF NOT EXISTS {{ app_db_name }} CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
-        CREATE USER IF NOT EXISTS '{{ app_db_user }}'@'%' IDENTIFIED BY '{{ app_db_pass }}';
-        GRANT ALL PRIVILEGES ON {{ app_db_name }}.* TO '{{ app_db_user }}'@'%';
-        FLUSH PRIVILEGES;
-        SQL
+    - name: Create application database
+      shell: >
+        mysql --batch --skip-column-names -e
+        "CREATE DATABASE IF NOT EXISTS {{ app_db_name }};"
       args:
-        executable: /bin/bash
-      register: mysql_secure_out
-      changed_when: mysql_secure_out.rc == 0
-      failed_when: mysql_secure_out.rc not in [0]
-      when: not db_marker_stat.stat.exists
+        warn: false
 
-    - name: Create db secure marker file
-      file:
-        path: "{{ db_marker }}"
-        state: touch
-      when: not db_marker_stat.stat.exists
+    - name: Create application DB user and grant privileges
+      shell: >
+        mysql --batch --skip-column-names -e
+        "CREATE USER IF NOT EXISTS '{{ app_db_user }}'@'%' IDENTIFIED BY '{{ app_db_password }}';
+         GRANT ALL PRIVILEGES ON {{ app_db_name }}.* TO '{{ app_db_user }}'@'%';
+         FLUSH PRIVILEGES;"
+      args:
+        warn: false
 
-    - name: Show mysql secure output (debug)
-      debug:
-        var: mysql_secure_out
-      when: mysql_secure_out is defined
+  handlers:
+    - name: restart mariadb
+      service:
+        name: mariadb
+        state: restarted
