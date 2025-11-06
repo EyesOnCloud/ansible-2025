@@ -2,12 +2,15 @@
 - name: Install Apache + PHP-FPM and deploy app page
   hosts: webserver
   become: yes
-  vars:
-    index_path: /var/www/html/index.php
-    success_marker: "APPLICATION_INSTALL_SUCCESS"
-    php_fpm_conf_path: /etc/apache2/conf-available/php-fpm.conf
-    php_fpm_socket: /run/php/php8.3-fpm.sock   # adjust if your PHP version differs
-
+vars:
+  index_path: /var/www/html/index.php
+  success_marker: "APPLICATION_INSTALL_SUCCESS"
+  php_fpm_conf_path: /etc/apache2/conf-available/php-fpm.conf
+  php_fpm_socket: /run/php/php8.3-fpm.sock
+  db_host: 192.168.100.151       
+  db_name: lampdb
+  db_user: lampuser
+  db_password: lamppass
   tasks:
     - name: Install Apache and PHP packages
       apt:
@@ -50,14 +53,32 @@
       changed_when: "'enabled' in (a2enconf_out.stdout | default(''))"
       failed_when: false
 
-    - name: Deploy index.php with success marker and date/time
+    - name: Deploy index.php with DB connection and success marker
       copy:
         dest: "{{ index_path }}"
         content: |
           <?php
+          $db_host = "{{ db_host }}";
+          $db_user = "{{ db_user }}";
+          $db_pass = "{{ db_password }}";
+          $db_name = "{{ db_name }}";
+    
           echo "<!doctype html><html><head><meta charset='utf-8'><title>Simple LAMP App</title></head><body>";
           echo "<h1>Simple LAMP App</h1>";
           echo "<p>Server date/time: " . date('Y-m-d H:i:s') . "</p>";
+    
+          // Try connecting to the database
+          $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
+    
+          if ($conn->connect_error) {
+              echo "<div style='color:red;'>Database connection failed: " . $conn->connect_error . "</div>";
+          } else {
+              $result = $conn->query("SELECT NOW() as current_time");
+              $row = $result->fetch_assoc();
+              echo "<div style='color:green;'>Connected to MySQL at $db_host</div>";
+              echo "<p>Database current time: " . $row['current_time'] . "</p>";
+          }
+    
           echo "<div>Application installed successfully — {{ success_marker }}</div>";
           echo "</body></html>";
         owner: www-data
