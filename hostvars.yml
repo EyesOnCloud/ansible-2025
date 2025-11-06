@@ -1,6 +1,6 @@
 ---
 - name: Collect info from all hosts
-  hosts: all
+  hosts: webserver
   gather_facts: false
   tasks:
     - name: Generate message per host
