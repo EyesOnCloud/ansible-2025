@@ -1,24 +1,42 @@
-- name: Rollback LAMP changes
-  hosts: webserver
+---
+- name: Rollback LAMP changes on webservers
+  hosts: 192.168.100.152
   become: yes
-  vars:
-    index_path: /var/www/html/index.php
-    index_backup: /var/www/html/index.php.bak
   tasks:
-    - name: Stop apache on webservers
-      service:
-        name: apache2
-        state: stopped
-      when: "'webserver' in group_names"
-      ignore_errors: yes
-
-    - name: Remove apache and php packages
+    - name: Remove Apache and PHP packages
       apt:
         name:
           - apache2
           - php
-          - libapache2-mod-php
           - php-mysql
+          - libapache2-mod-php
+          - php8.3-fpm
         state: absent
         purge: yes
-      when: true
+      ignore_errors: yes
+
+    - name: Clean up leftover web files
+      file:
+        path: /var/www/html/
+        state: absent
+      ignore_errors: yes
+
+- name: Rollback database changes
+  hosts: db
+  become: yes
+  tasks:
+    - name: Remove MariaDB/MySQL packages
+      apt:
+        name:
+          - mariadb-server
+          - mysql-server
+          - mysql-common
+        state: absent
+        purge: yes
+      ignore_errors: yes
+
+    - name: Remove MySQL data directory (optional)
+      file:
+        path: /var/lib/mysql
+        state: absent
+      ignore_errors: yes
