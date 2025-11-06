@@ -33,16 +33,17 @@
         path: /var/www/html/index.html
         state: absent
 
-    - name: Ensure mpm_event is disabled (switch to prefork for mod_php)
-      ansible.builtin.shell: |
-        # disable event, enable prefork and php mod
-        a2dismod mpm_event || true
+    - name: Ensure mpm_event is disabled and mpm_prefork + php8.3 are enabled (mod_php)
+      shell: |
+        if a2query -m mpm_event >/dev/null 2>&1; then
+          a2dismod mpm_event || true
+        fi
         a2enmod mpm_prefork || true
         a2enmod php8.3 || true
-      args:
-        warn: false
       register: mods_enable
-      changed_when: mods_enable.rc == 0
+      changed_when: >
+        (mods_enable.stdout is defined and (mods_enable.stdout | length) > 0)
+        or (mods_enable.rc is defined and mods_enable.rc != 0)
       failed_when: false
       notify: Restart apache
 
