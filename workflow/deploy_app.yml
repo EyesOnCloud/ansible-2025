@@ -43,11 +43,12 @@
       notify: Reload apache
 
     - name: Enable php-fpm Apache config
-      command: a2enconf php-fpm
+      ansible.builtin.shell: a2enconf php-fpm || true
       args:
         warn: false
       register: a2enconf_out
-      changed_when: "'enabled' in a2enconf_out.stdout.lower()"
+      changed_when: "'enabled' in (a2enconf_out.stdout | default(''))"
+      failed_when: false
 
     - name: Deploy index.php with success marker and date/time
       copy:
