@@ -1,27 +1,26 @@
 ---
-- name: Collect info from all hosts
+- name: Collect info on webservers
   hosts: webserver
   gather_facts: false
   tasks:
-    - name: Generate message per host
-      debug:
-        msg: "Host {{ inventory_hostname }} in {{ env }} environment with role {{ server_role }}"
-      register: host_message
-    - name: Store message in a fact
+    - name: Build a message for this host
       set_fact:
-        collected_msg: "{{ host_message.msg }}"
-        
-- name: Combine outputs and write to a single file
+        collected_msg: "Host {{ inventory_hostname }} - env={{ env | default('unknown') }} role={{ server_role | default('unknown') }}"
+
+- name: Aggregate webserver messages and store on test host(s)
   hosts: test
   gather_facts: false
   tasks:
-    - name: Combine all host messages
+    - name: Build combined output from webserver group
       set_fact:
-        combined_output: |
-          {% for host in play_hosts %}
-          {{ hostvars[host]['collected_msg'] }}
+        all_webserver_messages: |
+          {% for h in groups['webserver'] %}
+          {{ hostvars[h]['collected_msg'] | default('NO_MESSAGE_FROM_' + h) }}
           {% endfor %}
-    - name: Write combined output to file
+    - name: Debug combined content (visible in AWX output)
+      debug:
+        msg: "{{ all_webserver_messages }}"
+    - name: Persist combined output to a file on this test host
       copy:
-        dest: /tmp/all_hosts_output.txt
-        content: "{{ combined_output }}"
+        dest: /home/admin/vars.txt
+        content: "{{ all_webserver_messages }}"
