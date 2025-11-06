@@ -7,10 +7,11 @@
     success_marker: "APPLICATION_INSTALL_SUCCESS"
     php_fpm_conf_path: /etc/apache2/conf-available/php-fpm.conf
     php_fpm_socket: /run/php/php8.3-fpm.sock
-    db_host: 192.168.100.151       
+    db_host: 192.168.100.151
     db_name: lampdb
     db_user: lampuser
     db_password: lamppass
+
   tasks:
     - name: Install Apache and PHP packages
       apt:
@@ -20,6 +21,12 @@
           - php-mysql
           - php8.3-fpm
         state: present
+        update_cache: yes
+
+    - name: Remove default Apache index.html page
+      file:
+        path: /var/www/html/index.html
+        state: absent
 
     - name: Enable Apache modules required for PHP-FPM
       ansible.builtin.shell: |
@@ -30,8 +37,8 @@
       register: apache_mods
       changed_when: >
         apache_mods.stdout is defined and
-        ( 'enabled' in apache_mods.stdout.lower() or
-          'already enabled' not in apache_mods.stdout.lower() ) 
+        ('enabled' in apache_mods.stdout.lower() or
+         'already enabled' not in apache_mods.stdout.lower())
       failed_when: false
 
     - name: Create php-fpm Apache config
@@ -53,25 +60,31 @@
       changed_when: "'enabled' in (a2enconf_out.stdout | default(''))"
       failed_when: false
 
+    - name: Ensure php8.3-fpm service is running
+      service:
+        name: php8.3-fpm
+        state: started
+        enabled: yes
+
     - name: Deploy index.php with DB connection and success marker
       copy:
-        dest: /var/www/html/index.php
+        dest: "{{ index_path }}"
         content: |
           <?php
-          $db_host = "{{ db_host | default('192.168.100.151') }}";
-          $db_user = "{{ db_user | default('lampuser') }}";
-          $db_pass = "{{ db_password | default('lamppass') }}";
-          $db_name = "{{ db_name | default('lampdb') }}";
-    
+          $db_host = "{{ db_host }}";
+          $db_user = "{{ db_user }}";
+          $db_pass = "{{ db_password }}";
+          $db_name = "{{ db_name }}";
+
           function show($s){ echo htmlspecialchars($s); }
-    
+
           echo "<!doctype html><html><head><meta charset='utf-8'><title>Simple LAMP App</title></head><body>";
           echo "<h1>Simple LAMP App</h1>";
           echo "<p>Server date/time: " . date('Y-m-d H:i:s') . "</p>";
-    
+
           $conn = @new mysqli($db_host, $db_user, $db_pass, $db_name);
           if ($conn->connect_error) {
-              echo "<div style='color:red;'>Database connection failed.</div>";
+              echo "<div style='color:red;'>Database connection failed: " . htmlspecialchars($conn->connect_error) . "</div>";
           } else {
               $result = @$conn->query("SELECT NOW()");
               if ($result) {
@@ -84,6 +97,7 @@
               }
               $conn->close();
           }
+
           echo "<div>Application installed successfully — APPLICATION_INSTALL_SUCCESS</div>";
           echo "</body></html>";
         owner: www-data
