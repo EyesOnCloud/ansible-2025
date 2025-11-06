@@ -21,8 +21,6 @@
 
     - name: Create application database
       shell: mysql --batch --skip-column-names -e "CREATE DATABASE IF NOT EXISTS {{ app_db_name }};"
-      args:
-        warn: false
 
     - name: Create application DB user and grant privileges
       shell: >
