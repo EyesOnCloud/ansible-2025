@@ -21,20 +21,22 @@
         enabled: yes
 
     - name: Create application database
-      community.mysql.mysql_db:
-        name: "{{ app_db_name }}"
-        state: present
+      shell: >
+        mysql -e "CREATE DATABASE IF NOT EXISTS {{ app_db_name }};"
+      args:
+        warn: no
 
     - name: Create application DB user and grant privileges
-      community.mysql.mysql_user:
-        name: "{{ app_db_user }}"
-        password: "{{ app_db_password }}"
-        priv: "{{ app_db_name }}.*:ALL"
-        host: '%'
-        state: present
+      shell: >
+        mysql -e "CREATE USER IF NOT EXISTS '{{ app_db_user }}'@'%' IDENTIFIED BY '{{ app_db_password }}';
+        GRANT ALL PRIVILEGES ON {{ app_db_name }}.* TO '{{ app_db_user }}'@'%';
+        FLUSH PRIVILEGES;"
+      args:
+        warn: no
 
   handlers:
     - name: restart mariadb
       service:
         name: mariadb
         state: restarted
+
