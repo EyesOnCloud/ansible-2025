@@ -1,4 +1,24 @@
 ---
+- name: Rollback database changes
+  hosts: db
+  become: yes
+  tasks:
+    - name: Remove MariaDB/MySQL packages
+      apt:
+        name:
+          - mariadb-server
+          - mysql-server
+          - mysql-common
+        state: absent
+        purge: yes
+      ignore_errors: yes
+
+    - name: Remove MySQL data directory (optional)
+      file:
+        path: /var/lib/mysql
+        state: absent
+      ignore_errors: yes
+      
 - name: Rollback LAMP changes on webservers
   hosts: 192.168.100.152
   become: yes
@@ -18,25 +38,5 @@
     - name: Clean up leftover web files
       file:
         path: /var/www/html/
-        state: absent
-      ignore_errors: yes
-
-- name: Rollback database changes
-  hosts: db
-  become: yes
-  tasks:
-    - name: Remove MariaDB/MySQL packages
-      apt:
-        name:
-          - mariadb-server
-          - mysql-server
-          - mysql-common
-        state: absent
-        purge: yes
-      ignore_errors: yes
-
-    - name: Remove MySQL data directory (optional)
-      file:
-        path: /var/lib/mysql
         state: absent
       ignore_errors: yes
