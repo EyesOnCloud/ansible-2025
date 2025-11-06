@@ -7,22 +7,29 @@
     app_db_name: lampdb
     app_db_user: lampuser
     app_db_password: lamppass
+    mariadb_conf_file: /etc/mysql/mariadb.conf.d/50-server.cnf
 
   tasks:
     - name: Install MariaDB server
       apt:
         name: mariadb-server
         state: present
+        update_cache: yes
 
-    - name: Ensure MariaDB is enabled and running
-      service:
-        name: mariadb
-        state: started
-        enabled: yes
+    - name: Ensure MariaDB listens on all interfaces (bind-address = 0.0.0.0)
+      lineinfile:
+        path: "{{ mariadb_conf_file }}"
+        regexp: '^bind-address'
+        line: 'bind-address = 0.0.0.0'
+        insertafter: '^\[mysqld\]'
+        backup: yes
+      notify: restart mariadb
 
     - name: Create application database
       shell: >
         mysql -e "CREATE DATABASE IF NOT EXISTS {{ app_db_name }};"
+      args:
+        warn: false
 
     - name: Create application DB user and grant privileges
       shell: |
@@ -30,10 +37,13 @@
         CREATE USER IF NOT EXISTS '{{ app_db_user }}'@'%' IDENTIFIED BY '{{ app_db_password }}';
         GRANT ALL PRIVILEGES ON {{ app_db_name }}.* TO '{{ app_db_user }}'@'%';
         FLUSH PRIVILEGES;"
+      args:
+        warn: false
 
   handlers:
     - name: restart mariadb
       service:
         name: mariadb
         state: restarted
+
 
