@@ -1,12 +1,24 @@
----
-- name: Rollback to previous version
-  hosts: webservers
+- name: Rollback LAMP changes
+  hosts: all
   become: yes
-  gather_facts: false
-
+  vars:
+    index_path: /var/www/html/index.php
+    index_backup: /var/www/html/index.php.bak
   tasks:
-    - name: Replace index.php with maintenance message
-      copy:
-        dest: /var/www/html/index.php
-        content: "<?php echo 'Maintenance in progress. Rollback active.'; ?>"
-        mode: '0644'
+    - name: Stop apache on webservers
+      service:
+        name: apache2
+        state: stopped
+      when: "'webserver' in group_names"
+      ignore_errors: yes
+
+    - name: Remove apache and php packages
+      apt:
+        name:
+          - apache2
+          - php
+          - libapache2-mod-php
+          - php-mysql
+        state: absent
+        purge: yes
+      when: true
