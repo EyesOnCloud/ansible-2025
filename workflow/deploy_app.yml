@@ -19,12 +19,17 @@
         state: present
 
     - name: Enable Apache modules required for PHP-FPM
-      shell: |
-        a2enmod proxy proxy_fcgi setenvif
+      ansible.builtin.shell: |
+        a2enmod proxy proxy_fcgi setenvif || true
         a2dismod php8.3 || true
       args:
         warn: false
-      changed_when: false
+      register: apache_mods
+      changed_when: >
+        apache_mods.stdout is defined and
+        ( 'enabled' in apache_mods.stdout.lower() or
+          'already enabled' not in apache_mods.stdout.lower() ) 
+      failed_when: false
 
     - name: Create php-fpm Apache config
       copy:
