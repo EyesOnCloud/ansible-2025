@@ -1,0 +1,18 @@
+- name: Create allow-all network policy in argocd namespace
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: networking.k8s.io/v1
+      kind: NetworkPolicy
+      metadata:
+        name: allow-all-argocd-debug
+        namespace: argocd
+      spec:
+        podSelector: {}
+        ingress:
+          - {}
+        egress:
+          - {}
+        policyTypes:
+          - Ingress
+          - Egress
