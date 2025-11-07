@@ -1,0 +1,5 @@
+- name: Download the argo-cd manifest
+  ansible.builtin.get_url:
+    url: https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+    dest: ~/install.yml
+    mode: '0664'
