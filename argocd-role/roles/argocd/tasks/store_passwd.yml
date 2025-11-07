@@ -1,6 +1,0 @@
-- name: Get the initial password of the argocd
-  shell: sudo /usr/local/bin/argocd admin initial-password -n argocd
-  register: argo_passwd_output
-- name: Store the password in a variable
-  set_fact:
-    argo_password: "{{ argo_passwd_output.stdout_lines[0] }}"
