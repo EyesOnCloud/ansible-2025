@@ -5,3 +5,4 @@
 - import_tasks: csvc.yml
 - import_tasks: update_passwd.yml
 - import_tasks: set_context.yml
+- import_tasks: netpol.yml
