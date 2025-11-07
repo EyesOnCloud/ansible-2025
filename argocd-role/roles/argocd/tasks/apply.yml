@@ -1,5 +1,0 @@
-- name: Applying the manifest to the cluster
-  kubernetes.core.k8s:
-    namespace: argocd
-    state: present
-    src: ~/install.yml
