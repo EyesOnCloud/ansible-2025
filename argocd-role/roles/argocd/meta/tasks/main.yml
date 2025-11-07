@@ -1,0 +1,15 @@
+---
+- import_tasks: create_ns.yml
+- import_tasks: manifest.yml
+- import_tasks: apply.yml
+- import_tasks: dbinary.yml
+- import_tasks: ibinary.yml
+- import_tasks: rbinary.yml
+- import_tasks: csvc.yml
+- import_tasks: ipasswd.yml
+- import_tasks: store_passwd.yml
+- import_tasks: login.yml
+- import_tasks: update_passwd.yml
+- import_tasks: get_context.yml
+- import_tasks: store_context.yml
+- import_tasks: cluster.yml
