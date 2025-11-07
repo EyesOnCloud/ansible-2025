@@ -1,0 +1,6 @@
+- name: Creating a namespace
+  kubernetes.core.k8s:
+    name: argocd
+    api_version: v1
+    kind: Namespace
+    state: present
