@@ -1,0 +1,18 @@
+- name: Creating a service
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: argocd-server
+        namespace: argocd
+      spec:
+        selector:
+          app.kubernetes.io/name: argocd-server
+        ports:
+          - protocol: TCP
+            port: 80
+            targetPort: 8080
+            nodePort: 32000
+        type: LoadBalancer
