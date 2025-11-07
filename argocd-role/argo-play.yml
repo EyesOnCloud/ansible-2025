@@ -1,0 +1,81 @@
+---
+- name: Installing argo-cd on AWX
+  hosts: eoc-controller
+  become: yes
+  tasks:
+    - name: Creating a namespace
+      kubernetes.core.k8s:
+        name: argocd
+        api_version: v1
+        kind: Namespace
+        state: present
+
+    - name: Download the argo-cd manifest
+      ansible.builtin.get_url:
+        url: https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+        dest: ~/install.yml
+        mode: '0664'
+
+    - name: Applying the manifest to the cluster
+      kubernetes.core.k8s:
+        namespace: argocd
+        state: present
+        src: ~/install.yml
+
+    - name: Download argocd-linux-amd64 binary
+      ansible.builtin.get_url:
+        url: "https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64"
+        dest: "~/argocd-linux-amd64"
+        mode: "0755"
+
+    - name: Install argocd-linux-amd64 binary
+      shell: install -m 555 ~/argocd-linux-amd64 /usr/local/bin/argocd
+
+    - name: Remove argocd-linux-amd64 binary
+      ansible.builtin.file:
+        path: "~/argocd-linux-amd64"
+        state: absent
+
+    - name: Creating a service
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: argocd-server
+            namespace: argocd
+          spec:
+            selector:
+              app.kubernetes.io/name: argocd-server
+            ports:
+              - protocol: TCP
+                port: 80
+                targetPort: 8080
+                nodePort: 32000
+            type: LoadBalancer
+
+    - name: Get the initial password of the argocd
+      shell: /usr/local/bin/argocd admin initial-password -n argocd
+      register: argo_passwd_output
+
+    - name: Store the password in a variable
+      set_fact:
+        argo_password: "{{ argo_passwd_output.stdout_lines[0] }}"
+
+    - name: Login into argo-cd
+      shell: /usr/local/bin/argocd login 192.168.100.150:32000 --username admin --password {{ argo_password }} --insecure
+
+    - name: Update the password
+      shell: /usr/local/bin/argocd account update-password --current-password {{ argo_password }} --new-password Welcome@123 --insecure
+
+    - name: Get Kubernetes contexts
+      shell: kubectl config get-contexts -o name
+      register: kubectl_contexts_output
+
+    - name: Store the context name in a variable
+      set_fact:
+        context_name: "{{ kubectl_contexts_output.stdout }}"
+
+    - name: Add the context to the argocd cluster
+      shell: /usr/local/bin/argocd cluster add "{{ context_name }}" -y
