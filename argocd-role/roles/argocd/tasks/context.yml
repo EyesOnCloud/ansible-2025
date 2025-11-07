@@ -1,0 +1,6 @@
+- name: Get Kubernetes contexts
+  shell: kubectl config get-contexts -o name
+  register: kubectl_contexts_output
+- name: Store the context name in a variable
+  set_fact:
+    context_name: "{{ kubectl_contexts_output.stdout }}"
